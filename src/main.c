@@ -1,7 +1,10 @@
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
+#include <zephyr/devicetree.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/uart.h>
+#include <zephyr/drivers/spi.h>
+#include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(main,LOG_LEVEL_DBG);
@@ -10,6 +13,9 @@ LOG_MODULE_REGISTER(main,LOG_LEVEL_DBG);
 
 // device pointers
 const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(uart0));
+#define SPIOP	SPI_WORD_SET(8) | SPI_TRANSFER_MSB
+struct spi_dt_spec ism303_spispec = SPI_DT_SPEC_GET(DT_NODELABEL(ism330dhcx), SPIOP, 0);
+struct spi_dt_spec lsm330_spispec = SPI_DT_SPEC_GET(DT_NODELABEL(lsm303agr), SPIOP, 0);
 const struct gpio_dt_spec uart_ctrl = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, uartctrl_gpios);
 
 // uart
