@@ -3,6 +3,9 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
 project(app)
 
-target_sources(app PRIVATE src/main.c)
+target_sources(app PRIVATE src/main.c
+                    src/functionalities.c
+                    src/functionalities.h
+                    src/project.h)
 
 list(APPEND BOARD_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/<C:/ln/boards>)
