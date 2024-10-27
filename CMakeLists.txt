@@ -6,6 +6,11 @@ project(app)
 target_sources(app PRIVATE src/main.c
                     src/functionalities.c
                     src/functionalities.h
-                    src/project.h)
+                    src/project.h
+                    src/u_error_common.h
+                    src/u_ubx_protocol.c
+                    src/u_ubx_protocol.h)
 
-list(APPEND BOARD_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/<C:/ln/boards>)
+set(BOARD_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/.)
+list(APPEND BOARD_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/boards>)
+# list(APPEND ZEPHYR_EXTRA_MODULES ${CMAKE_CURRENT_SOURCE_DIR}/drivers/ubx )

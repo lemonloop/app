@@ -26,13 +26,13 @@ struct lsm_config { // struct to store the sensor configurations
 };
 
 struct lsm_data {
-        uint8_t out_t_a;
-        uint16_t out_x_a;
-        uint16_t out_y_a;
-        uint16_t out_z_a;
-        uint16_t outx_m;
-        uint16_t outy_m;
-        uint16_t outz_m;
+        int8_t out_t_a;
+        int16_t out_x_a;
+        int16_t out_y_a;
+        int16_t out_z_a;
+        int16_t outx_m;
+        int16_t outy_m;
+        int16_t outz_m;
 };
 
 static int lsm_read_reg(uint8_t reg, uint8_t *data, uint8_t size);
@@ -57,18 +57,37 @@ struct ism_config { // struct to store the sensor configurations
 };
 
 struct ism_data {
-        uint16_t out_temp;
-        uint16_t out_x_a;
-        uint16_t out_y_a;
-        uint16_t out_z_a;
-        uint16_t outx_g;
-        uint16_t outy_g;
-        uint16_t outz_g;
+        int16_t out_temp;
+        int16_t out_x_a;
+        int16_t out_y_a;
+        int16_t out_z_a;
+        int16_t outx_g;
+        int16_t outy_g;
+        int16_t outz_g;
 };
 
 static int ism_read_reg(uint8_t reg, uint8_t *data, uint8_t size);
 static int ism_write_reg(uint8_t reg, uint8_t value);
 void ism_init(void);
 int ism_read_outputs(struct ism_data ismdata);
+
+/************ U Blox: ZED-F9P-02B ************/
+// copy from christian:
+
+struct gps_data {
+   int32_t latitude;
+   int32_t longitude;
+   int32_t time;
+   int16_t horizontal_accuracy;
+   uint16_t time_until_lock;
+   int32_t sample_count;
+};	
+
+void gps_reset_data(struct gps_data *gps);
+void gps_serial_cb(const struct device *dev, void *user_data);
+void gps_parse_rxbuffer(struct gps_data *gps, char rx_buf[], int32_t buffer_len);
+void gps_initialize_module();
+void gps_init();
+void gps_poll(struct gps_data *gps);
 
 #endif
