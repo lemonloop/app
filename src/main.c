@@ -11,7 +11,7 @@ const struct gpio_dt_spec uart_ctrl = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, uartctr
 
 // uart
 static uint8_t rx_buf[128] = {0};
-// static uint8_t tx_buf[] = {"hello"};
+static uint8_t tx_buf[64] = {"hello"};
 
 static void uart_cb(const struct device *dev, struct uart_event *evt, void *user_data)
 {
@@ -66,7 +66,7 @@ int main(void)
         // interupt driven
 	uart_irq_callback_user_data_set(uart, gps_serial_cb, &gps);
 	uart_irq_rx_enable(uart);
-
+        k_msleep(100);
         gps_init();
 
         while(1){

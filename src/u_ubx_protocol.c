@@ -1,12 +1,11 @@
 /*
- * Copyright (c) 2017, Arm Limited and affiliates.
- * SPDX-License-Identifier: Apache-2.0
+ * Copyright 2019-2024 u-blox
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *  * http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,7 +21,7 @@
  */
 
 /** @file
- * @brief Implementation of the ubx protocol message encode/decode API.
+ * @brief Implementation of the UBX protocol message encode/decode API.
  */
 
 #ifdef U_CFG_OVERRIDE
@@ -163,7 +162,7 @@ uint64_t uUbxProtocolUint64Encode(uint64_t uint64)
     return  retValue;
 }
 
-// Encode a ubx protocol message.
+// Encode a UBX protocol message.
 int32_t uUbxProtocolEncode(int32_t messageClass, int32_t messageId,
                            const char *pMessage, size_t messageBodyLengthBytes,
                            char *pBuffer)
@@ -210,7 +209,7 @@ int32_t uUbxProtocolEncode(int32_t messageClass, int32_t messageId,
     return errorCodeOrLength;
 }
 
-// Decode a ubx protocol message.
+// Decode a UBX protocol message.
 int32_t uUbxProtocolDecode(const char *pBufferIn, size_t bufferLengthBytes,
                            int32_t *pMessageClass, int32_t *pMessageId,
                            char *pMessage, size_t maxMessageLengthBytes,
