@@ -261,21 +261,7 @@ int ism_read_outputs(struct ism_data ismdata){
 
 /************ U Blox: ZED-F9P-02B ************/
 
-#define GPS_RX_BUF_SIZE 128
-#define GPS_TX_BUF_SIZE 64
-#define UBX_MAX_MSG_IN_BUFFER 3
-#define UBX_CLASS_NAV 0x01
-#define UBX_MSGID_POSLLH 0x02
-#define UBX_MSGID_TIMEUTC 0x21
-#define UBX_CLASS_CFG 0x06
-#define UBX_MSGID_VALSET 0x8a
-
-const struct device *gps_uart = DEVICE_DT_GET(DT_NODELABEL(uart0));
-
 // ***** from Christian *****
-// use only one buffer
-static char gps_rx_uart_buffer[GPS_RX_BUF_SIZE];
-static int gps_rx_buf_pos;
 
 // reset the gps data
 void gps_reset_data(struct gps_data *gps) {
@@ -330,7 +316,7 @@ void gps_parse_rxbuffer(struct gps_data *gps, char rx_buf[], int32_t buffer_len)
 
         // for debugging
         LOG_DBG("decoded byte count: %d, decoded_classid: %d, decoded_messageid: %d",decoded_byte_count,decoded_classid,decoded_messageid);
-        LOG_HEXDUMP_INF(ubx_nav_response, GPS_RX_BUF_SIZE, "ubx_nav_response");
+        //LOG_HEXDUMP_INF(ubx_nav_response, GPS_RX_BUF_SIZE, "ubx_nav_response");
 
 		if (decoded_byte_count > 0) {
 			//sane NAV_POSLLH response from module
@@ -442,13 +428,10 @@ void gps_poll(struct gps_data *gps){
     // LOG_INF("lon; %i; lat; %i; time; %i; horAcc; %i", gps->longitude, gps->latitude, gps->time, gps->horizontal_accuracy);
 
     // Check if response from last time is in buffer
-	gps_parse_rxbuffer(&gps, gps_rx_uart_buffer, GPS_RX_BUF_SIZE); 
+	gps_parse_rxbuffer(gps, gps_rx_uart_buffer, GPS_RX_BUF_SIZE); 
 
-    
     return;
 }
-
-
 
 /************ LED-Ring and Power manager: nPM1300-QEAA ************/
 //bootup: turkies ring
@@ -456,3 +439,117 @@ void gps_poll(struct gps_data *gps){
 //when received an interrupt: red blinking 3times
 
 //point to slave if possible
+
+
+/************ LoRa ************/
+
+//lora init
+int is_lora_busy(){
+    const struct gpio_dt_spec busy = GPIO_DT_SPEC_GET(DT_CHILD(DT_NODELABEL(spi1),loradev_0),busy_gpios);
+    int by = gpio_pin_get_dt(&busy);
+    LOG_INF("Busy = %d",by);
+    return by;
+}
+
+
+int lora_init(){
+    if (is_lora_busy()){
+        LOG_ERR("lora not ready"); // try resetting and try again if still not return -1
+
+        const struct gpio_dt_spec reset = GPIO_DT_SPEC_GET(DT_CHILD(DT_NODELABEL(spi1),loradev_0),reset_gpios);
+        gpio_pin_configure_dt(&reset, GPIO_OUTPUT_ACTIVE);
+        k_msleep(100); //at least 1ms
+        gpio_pin_configure_dt(&reset, GPIO_OUTPUT_INACTIVE);
+        k_msleep(100);
+
+        if(is_lora_busy()){
+            LOG_ERR("Reset did not work, lora still not ready");
+            return -1;
+        }
+    }
+
+    struct lora_modem_config lora_con = {
+        .frequency = 865100000, //863MHz - 870MHz
+        .bandwidth = BW_125_KHZ, // shouldn't use 500kHz
+        .datarate = SF_7,
+        .coding_rate = CR_4_5,
+        .preamble_len = 8, // as short as possible for reduced latency
+        .iq_inverted = false,
+        .public_network = false,
+        .tx_power = 4,
+#if MASTER
+        .tx = false
+#else
+        .tx = true
+#endif
+    };
+
+    int err = lora_config(lora_dev,&lora_con);
+    if (err < 0){
+        LOG_ERR("configuration LoRa failed!");
+        return err;
+    }
+    LOG_DBG("LoRa initialized");
+    return 0;
+}
+
+//lora send
+int lora_send_data(struct gps_data *gps){
+    gps_parse_rxbuffer(gps, gps_rx_uart_buffer, GPS_RX_BUF_SIZE);
+
+    struct lora_payload payload = {
+        .preamble = LORA_PREAMBLE,
+        .origin_device_id = (uint64_t)UNIQUE_CHIP_ID,
+        .ublox_gps_data = *gps
+    };
+
+    int err = lora_send(lora_dev,(uint8_t*)(&payload),sizeof(payload));
+
+    if(err < 0){
+        LOG_ERR("LoRa send failed!");
+        return err;
+    }
+
+    LOG_INF("sent user data over LoRa of size: %d", sizeof(payload));
+    return 0;
+}
+
+int lora_receive_data(struct gps_data *gps_slave,uint64_t *origin, int16_t *rssi, int8_t *snr){
+    struct lora_payload payload;
+    
+    LOG_DBG("before receiving");
+    int len = lora_recv(lora_dev, (uint8_t*)(&payload), sizeof(payload), K_FOREVER, rssi, snr);
+    LOG_DBG("after receiving");
+
+    if(len < 0){
+        LOG_ERR("LoRa receive failed with err: %d",len);
+        return len;
+    }
+
+    LOG_INF("Received data with length of %d",len);
+
+    LOG_DBG("preamble: \t %d \t origin_device_id \t 0x%016llx",payload.preamble,payload.origin_device_id);
+
+    // only update if same preamble -> was ment for us
+    if(payload.preamble == LORA_PREAMBLE){
+        LOG_INF("Updating gps values");
+        gps_slave->longitude=payload.ublox_gps_data.longitude;
+        gps_slave->latitude=payload.ublox_gps_data.longitude;
+        gps_slave->horizontal_accuracy=payload.ublox_gps_data.horizontal_accuracy;
+        gps_slave->time=payload.ublox_gps_data.time;
+        gps_slave->sample_count=payload.ublox_gps_data.sample_count;
+        *origin = payload.origin_device_id;
+        return 0;
+    }
+    return -1;
+}
+
+int lora_wakeup(){
+    const struct gpio_dt_spec cs = GPIO_DT_SPEC_GET(DT_NODELABEL(spi1), cs_gpios);
+    int err = gpio_pin_configure_dt(&cs, GPIO_OUTPUT_ACTIVE);
+    if(err != 0){
+        LOG_ERR("could not set cs low, could not wake lora up");
+        return err;
+    }
+    return 0;
+}

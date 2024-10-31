@@ -6,38 +6,38 @@ LOG_MODULE_REGISTER(main,LOG_LEVEL_DBG);
 #define ZEPHYR_USER_NODE DT_PATH(zephyr_user)
 
 // device pointers
-const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(uart0));
+//const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(uart0));
 const struct gpio_dt_spec uart_ctrl = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, uartctrl_gpios);
 
-// uart
-static uint8_t rx_buf[128] = {0};
-static uint8_t tx_buf[64] = {"hello"};
+// // uart
+// static uint8_t rx_buf[128] = {0};
+// static uint8_t tx_buf[64] = {"hello"};
 
-static void uart_cb(const struct device *dev, struct uart_event *evt, void *user_data)
-{
-	switch (evt->type) {
+// static void uart_cb(const struct device *dev, struct uart_event *evt, void *user_data)
+// {
+// 	switch (evt->type) {
 		
-	case UART_TX_DONE:
-                LOG_DBG("uart send buffer");
-                break;
+// 	case UART_TX_DONE:
+//                 LOG_DBG("uart send buffer");
+//                 break;
         
-        case UART_RX_RDY:
-		// do something
-                int size = evt->data.rx.len;
-                int offset = evt->data.rx.offset;
-                for (int i=0; i<size; i++){
-                        rx_buf[i] = evt->data.rx.buf[offset + i];
-                }
-		break;
+//         case UART_RX_RDY:
+// 		// do something
+//                 int size = evt->data.rx.len;
+//                 int offset = evt->data.rx.offset;
+//                 for (int i=0; i<size; i++){
+//                         rx_buf[i] = evt->data.rx.buf[offset + i];
+//                 }
+// 		break;
 		
-	case UART_RX_DISABLED:
-		uart_rx_enable(dev, rx_buf, sizeof(rx_buf), 100);
-		break;
+// 	case UART_RX_DISABLED:
+// 		uart_rx_enable(dev, rx_buf, sizeof(rx_buf), 100);
+// 		break;
 		
-	default:
-		break;
-	}
-}
+// 	default:
+// 		break;
+// 	}
+// }
 
 int main(void)
 {
@@ -50,7 +50,7 @@ int main(void)
         
         int err = gpio_pin_configure_dt(&uart_ctrl, GPIO_OUTPUT_HIGH);
         
-        if (!device_is_ready(uart)){
+        if (!device_is_ready(gps_uart)){
                 LOG_ERR("uart not ready");
         }
         
@@ -64,10 +64,17 @@ int main(void)
         // uart_rx_enable(uart, rx_buf, sizeof(rx_buf), 100);
 
         // interupt driven
-	uart_irq_callback_user_data_set(uart, gps_serial_cb, &gps);
-	uart_irq_rx_enable(uart);
+	uart_irq_callback_user_data_set(gps_uart, gps_serial_cb, &gps);
+	uart_irq_rx_enable(gps_uart);
         k_msleep(100);
         gps_init();
+        gps_reset_data(&gps);
+
+        //lora
+        k_msleep(500);
+        lora_init();
+        k_msleep(500);
+        
 
         while(1){
                 // err = uart_tx(uart, tx_buf, sizeof(tx_buf), SYS_FOREVER_US);
@@ -76,10 +83,18 @@ int main(void)
                 //         return err;
                 // }
 
-                gps_poll(&gps);
-                k_sleep(K_MSEC(1000));
-                gps_reset_data(&gps);
+                // gps_poll(&gps);
+                // k_sleep(K_MSEC(1000));
+                // gps_reset_data(&gps);
+                // k_msleep(100);
+                while(is_lora_busy()){
+                        k_msleep(100);
+                        lora_wakeup();
+                        k_msleep(50);
+                }
+                lora_send_data(&gps);
                 k_msleep(100);
+
         }
 
         // int err;

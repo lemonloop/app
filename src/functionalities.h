@@ -74,6 +74,22 @@ int ism_read_outputs(struct ism_data ismdata);
 /************ U Blox: ZED-F9P-02B ************/
 // copy from christian:
 
+#define GPS_RX_BUF_SIZE 128
+#define GPS_TX_BUF_SIZE 64
+#define UBX_MAX_MSG_IN_BUFFER 3
+#define UBX_CLASS_NAV 0x01
+#define UBX_MSGID_POSLLH 0x02
+#define UBX_MSGID_TIMEUTC 0x21
+#define UBX_CLASS_CFG 0x06
+#define UBX_MSGID_VALSET 0x8a
+
+static struct device *gps_uart = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+// use only one buffer
+static char gps_rx_uart_buffer[GPS_RX_BUF_SIZE];
+static int gps_rx_buf_pos;
+
+// TODO: change attributes
 struct gps_data {
    int32_t latitude;
    int32_t longitude;
@@ -89,5 +105,23 @@ void gps_parse_rxbuffer(struct gps_data *gps, char rx_buf[], int32_t buffer_len)
 void gps_initialize_module();
 void gps_init();
 void gps_poll(struct gps_data *gps);
+
+//
+#define LORA_PREAMBLE   0b1010110011110000 //2 bytes / 8 bit
+
+// TODO: add information on interrupt
+struct lora_payload {
+        uint16_t preamble;
+        uint64_t origin_device_id;
+        struct gps_data ublox_gps_data;
+};
+
+static const struct device* lora_dev = DEVICE_DT_GET(DT_NODELABEL(lora_dev));
+
+int is_lora_busy();
+int lora_init();
+int lora_send_data(struct gps_data *gps);
+int lora_receive_data(struct gps_data *gps_slave,uint64_t *origin, int16_t *rssi, int8_t *snr);
+int lora_wakeup();
 
 #endif
