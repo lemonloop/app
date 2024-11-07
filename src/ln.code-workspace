@@ -1,0 +1,33 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		},
+		{
+			"name": "app",
+			"path": "../../../nordic/henrique_duartehachmeistercaraca_418/sw/localisation_node/app"
+		},
+		{
+			"path": "../../../nordic/henrique_duartehachmeistercaraca_418/sw/localisation_node"
+		}
+	],
+	"settings": {
+		"nrf-connect.applications": [
+			"${workspaceFolder}\\app",
+			"c:\\nordic\\led_ring"
+		],
+		"files.associations": {
+			"kernel.h": "c",
+			"uart.h": "c",
+			"gpio.h": "c",
+			"project.h": "c",
+			"devicetree.h": "c",
+			"log.h": "c",
+			"sensor.h": "c",
+			"spi.h": "c",
+			"device.h": "c",
+			"functionalities.h": "c",
+			"lora.h": "c"
+		}
+	}
+}

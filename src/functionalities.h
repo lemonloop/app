@@ -3,6 +3,9 @@
 #ifndef FUNCTIONALITIES_H
 #define FUNCTIONALITIES_H
 
+#define MAIN_THREAD_STACK_SIZE 4096
+#define MAIN_THREAD_PRIORITY 5
+
 /************ sensor: LSM303AHTR ************/
 // configuration values TODO:change
 #define CTRL1_A         0xF0
@@ -113,8 +116,13 @@ void gps_poll(struct gps_data *gps);
 struct lora_payload {
         uint16_t preamble;
         uint64_t origin_device_id;
-        struct gps_data ublox_gps_data;
+        int32_t latitude;
+        int32_t longitude;
+        int32_t time;
+        int16_t horizontal_accuracy;
 };
+
+
 
 static const struct device* lora_dev = DEVICE_DT_GET(DT_NODELABEL(lora_dev));
 

@@ -69,6 +69,7 @@ int main(void)
         k_msleep(100);
         gps_init();
         gps_reset_data(&gps);
+        //gps_poll(&gps);
 
         //lora
         k_msleep(500);
@@ -86,12 +87,7 @@ int main(void)
                 // gps_poll(&gps);
                 // k_sleep(K_MSEC(1000));
                 // gps_reset_data(&gps);
-                // k_msleep(100);
-                while(is_lora_busy()){
-                        k_msleep(100);
-                        lora_wakeup();
-                        k_msleep(50);
-                }
+                // k_msleep(100);{
                 lora_send_data(&gps);
                 k_msleep(100);
 

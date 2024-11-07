@@ -377,8 +377,8 @@ void gps_init(){
     // payload for UBX_CFG_VALSET for CFG_MSGOUT:
     uint8_t ubx_request_poll[GPS_TX_BUF_SIZE] = 
                     {0x00,0x07,0x00,0x00, //save the configuration in all three layers of memory storage
-                    0x2a,0x00,0x91,0x20,0x01, // key and value for: enable nav posllh at uart 1
-                    0x5c,0x00,0x91,0x20,0x01, // key and value for: enable nav utc at uart 1
+                    0x2a,0x00,0x91,0x20,0x00, // key and value for: enable nav posllh at uart 1
+                    0x5c,0x00,0x91,0x20,0x00, // key and value for: enable nav utc at uart 1
                     0xb1,0x00,0x91,0x20,0x00, // key and value for: disable nmea vtg at uart 1
                     0xac,0x00,0x91,0x20,0x00, // key and value for: disable nmea rmc at uart 1
                     0xc5,0x00,0x91,0x20,0x00, // key and value for: disable nmea gsv at uart 1
@@ -406,9 +406,9 @@ void gps_poll(struct gps_data *gps){
     // encode polling messages once, then use multiple times
 	// naviation request message (we read the one of the last request, but only few seconds old so no issue)
 	encoded_byte_count = uUbxProtocolEncode(UBX_CLASS_NAV, UBX_MSGID_POSLLH, NULL, 0, buf_tx);
-	//encoded_byte_count += 16;
+	encoded_byte_count += 16;
 	// time request message and append in buffer
-	//encoded_byte_count += uUbxProtocolEncode(UBX_CLASS_NAV, UBX_MSGID_TIMEUTC, NULL, 0, buf_tx+encoded_byte_count);
+	encoded_byte_count += uUbxProtocolEncode(UBX_CLASS_NAV, UBX_MSGID_TIMEUTC, NULL, 0, buf_tx+encoded_byte_count);
 
     for (uint32_t j = 0; j < 240; j++) {
 		k_sleep(K_SECONDS(1));
@@ -453,7 +453,7 @@ int is_lora_busy(){
 
 
 int lora_init(){
-    if (is_lora_busy()){
+    if (!device_is_ready(lora_dev)){
         LOG_ERR("lora not ready"); // try resetting and try again if still not return -1
 
         const struct gpio_dt_spec reset = GPIO_DT_SPEC_GET(DT_CHILD(DT_NODELABEL(spi1),loradev_0),reset_gpios);
@@ -462,7 +462,7 @@ int lora_init(){
         gpio_pin_configure_dt(&reset, GPIO_OUTPUT_INACTIVE);
         k_msleep(100);
 
-        if(is_lora_busy()){
+        if(!device_is_ready(lora_dev)){
             LOG_ERR("Reset did not work, lora still not ready");
             return -1;
         }
@@ -495,18 +495,23 @@ int lora_init(){
 
 //lora send
 int lora_send_data(struct gps_data *gps){
-    gps_parse_rxbuffer(gps, gps_rx_uart_buffer, GPS_RX_BUF_SIZE);
+    gps_parse_rxbuffer(gps, gps_rx_uart_buffer, GPS_RX_BUF_SIZE); 
 
     struct lora_payload payload = {
         .preamble = LORA_PREAMBLE,
         .origin_device_id = (uint64_t)UNIQUE_CHIP_ID,
-        .ublox_gps_data = *gps
+        .latitude = gps->latitude,
+        .longitude = gps->longitude,
+        .horizontal_accuracy = gps->horizontal_accuracy,
+        .time = gps->time
     };
+
+    k_msleep(1000);
 
     int err = lora_send(lora_dev,(uint8_t*)(&payload),sizeof(payload));
 
     if(err < 0){
-        LOG_ERR("LoRa send failed!");
+        LOG_ERR("LoRa send failed!, size: %d",sizeof(payload));
         return err;
     }
 
@@ -514,6 +519,7 @@ int lora_send_data(struct gps_data *gps){
     return 0;
 }
 
+//lora receive_data
 int lora_receive_data(struct gps_data *gps_slave,uint64_t *origin, int16_t *rssi, int8_t *snr){
     struct lora_payload payload;
     
@@ -533,11 +539,10 @@ int lora_receive_data(struct gps_data *gps_slave,uint64_t *origin, int16_t *rssi
     // only update if same preamble -> was ment for us
     if(payload.preamble == LORA_PREAMBLE){
         LOG_INF("Updating gps values");
-        gps_slave->longitude=payload.ublox_gps_data.longitude;
-        gps_slave->latitude=payload.ublox_gps_data.longitude;
-        gps_slave->horizontal_accuracy=payload.ublox_gps_data.horizontal_accuracy;
-        gps_slave->time=payload.ublox_gps_data.time;
-        gps_slave->sample_count=payload.ublox_gps_data.sample_count;
+        gps_slave->longitude=payload.longitude;
+        gps_slave->latitude=payload.longitude;
+        gps_slave->horizontal_accuracy=payload.horizontal_accuracy;
+        gps_slave->time=payload.time;
         *origin = payload.origin_device_id;
         return 0;
     }
