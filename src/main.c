@@ -8,6 +8,7 @@ LOG_MODULE_REGISTER(main,LOG_LEVEL_DBG);
 // device pointers
 //const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(uart0));
 const struct gpio_dt_spec uart_ctrl = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, uartctrl_gpios);
+const struct gpio_dt_spec en_led = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE,en_ledring_gpios);
 
 // // uart
 // static uint8_t rx_buf[128] = {0};
@@ -42,7 +43,12 @@ const struct gpio_dt_spec uart_ctrl = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, uartctr
 int main(void)
 {
         struct gps_data gps;
-        
+#if MASTER
+        struct gps_data slave_gps;
+        uint64_t gps_origin;
+        int16_t slave_rssi;
+        int8_t slave_snr;
+#endif
         // if(!device_is_ready(&uart_ctrl)){
         //         LOG_ERR("uart control pin not ready");
         //         return 1;
@@ -53,6 +59,12 @@ int main(void)
         if (!device_is_ready(gps_uart)){
                 LOG_ERR("uart not ready");
         }
+
+        k_msleep(1000);
+        err = npm1300_init();
+        //activate the led drivers
+        err = gpio_pin_configure_dt(&en_led,GPIO_OUTPUT_HIGH);
+        err = lp5012_init();
         
         // asynch
         // err = uart_callback_set(uart, gps_serial_cb, &gps);
@@ -63,13 +75,14 @@ int main(void)
 
         // uart_rx_enable(uart, rx_buf, sizeof(rx_buf), 100);
 
+
         // interupt driven
 	uart_irq_callback_user_data_set(gps_uart, gps_serial_cb, &gps);
 	uart_irq_rx_enable(gps_uart);
         k_msleep(100);
         gps_init();
         gps_reset_data(&gps);
-        //gps_poll(&gps);
+        gps_poll(&gps);
 
         //lora
         k_msleep(500);
@@ -88,8 +101,13 @@ int main(void)
                 // k_sleep(K_MSEC(1000));
                 // gps_reset_data(&gps);
                 // k_msleep(100);{
-                lora_send_data(&gps);
+#if MASTER
+                lora_receive_data(&slave_gps,&gps_origin,&slave_rssi,&slave_snr);
                 k_msleep(100);
+#else
+                lora_send_data(&gps);
+                k_msleep(1000);
+#endif
 
         }
 

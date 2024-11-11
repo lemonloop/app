@@ -27,7 +27,9 @@
 			"spi.h": "c",
 			"device.h": "c",
 			"functionalities.h": "c",
-			"lora.h": "c"
+			"lora.h": "c",
+			"lp50xx.h": "c",
+			"led.h": "c"
 		}
 	}
 }

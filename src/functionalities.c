@@ -410,31 +410,134 @@ void gps_poll(struct gps_data *gps){
 	// time request message and append in buffer
 	encoded_byte_count += uUbxProtocolEncode(UBX_CLASS_NAV, UBX_MSGID_TIMEUTC, NULL, 0, buf_tx+encoded_byte_count);
 
-    for (uint32_t j = 0; j < 240; j++) {
-		k_sleep(K_SECONDS(1));
+	k_sleep(K_SECONDS(1));
 
-		// send polling requests via uart
-		for(uint32_t poll_k = 0; poll_k < encoded_byte_count; poll_k++) {
-			uart_poll_out(gps_uart, buf_tx[poll_k]);
-		}
+	// send polling requests via uart
+	for(uint32_t poll_k = 0; poll_k < encoded_byte_count; poll_k++) {
+		uart_poll_out(gps_uart, buf_tx[poll_k]);
+	}
 		
-		//current state, if time stays 0 we do not get any serial messages...
-		LOG_INF("lon; %i; lat; %i; time; %i; horAcc; %i", gps->longitude, gps->latitude, gps->time, gps->horizontal_accuracy);
+	//current state, if time stays 0 we do not get any serial messages...
+	LOG_INF("lon; %i; lat; %i; time; %i; horAcc; %i", gps->longitude, gps->latitude, gps->time, gps->horizontal_accuracy);
 				
-		// track how long the locking takes. Currently not in use...
-		gps->time_until_lock++;
- 	}
+	// track how long the locking takes. Currently not in use...
+	gps->time_until_lock++;
+ 	
 
     // LOG_INF("lon; %i; lat; %i; time; %i; horAcc; %i", gps->longitude, gps->latitude, gps->time, gps->horizontal_accuracy);
 
     // Check if response from last time is in buffer
-	gps_parse_rxbuffer(gps, gps_rx_uart_buffer, GPS_RX_BUF_SIZE); 
+	//gps_parse_rxbuffer(gps, gps_rx_uart_buffer, GPS_RX_BUF_SIZE); 
 
     return;
 }
 
 /************ LED-Ring and Power manager: nPM1300-QEAA ************/
-//bootup: turkies ring
+//not mine
+void dev_not_ready_details(const struct device* dev) {
+	if(dev == NULL) {
+		LOG_ERR("dev is NULL\r\n");
+		return;
+	}
+	if(!dev->state->initialized) {
+		LOG_ERR("dev->state->initialized is false\r\n");
+	}
+	if(dev->state->init_res != 0) {
+		LOG_ERR("errno %u\r\n", dev->state->init_res);
+	}
+	return;
+}
+
+//npm1300 init
+int npm1300_led_colour_set(led_color_t colour){
+    // turn off leds complitly
+    int ret = led_off(npm_led,red);
+    ret |= led_off(npm_led,green);
+    ret |= led_off(npm_led,blue);
+
+    switch (colour) {
+        case (led_color_t) red:
+            ret |= led_on(npm_led,red);
+            break;
+        case (led_color_t) green:
+            ret |= led_on(npm_led,green);
+            break;
+        case (led_color_t) blue:
+            ret |= led_on(npm_led,blue);
+            break;
+        case (led_color_t) yellow:
+            ret |= led_on(npm_led,red);
+            ret |= led_on(npm_led,green);
+            break;
+        case (led_color_t) magenta:
+            ret |= led_on(npm_led,red);
+            ret |= led_on(npm_led,blue);
+            break;
+        case (led_color_t) cyan:
+            ret |= led_on(npm_led,green);
+            ret |= led_on(npm_led,blue);
+            break;
+        case (led_color_t) white:
+            ret |= led_on(npm_led,red);
+            ret |= led_on(npm_led,green);
+            ret |= led_on(npm_led,blue);
+            break;
+        default: //no valid colour
+            LOG_ERR("Colour: %u is not valid",colour);
+            ret = -1;
+            break;
+    }
+    return ret;
+}
+
+int npm1300_init() {
+    int err = 0;
+    if (!device_is_ready(npm1300)){
+        LOG_ERR("npm1300 not read");
+        dev_not_ready_details(npm1300);
+        return -1;
+    }
+    if (!device_is_ready(regulator)){
+        LOG_ERR("regulator device not ready");
+        dev_not_ready_details(regulator);
+        err = -1;
+    }
+    if (!device_is_ready(charger)){
+        LOG_ERR("charger device not ready");
+        dev_not_ready_details(charger);
+        err = -1;
+    }
+    if (!device_is_ready(npm_led)){
+        LOG_ERR("npm LEDs device not ready");
+        dev_not_ready_details(npm1300);
+        err = -1;
+    }
+    // turn on based on MASTER or SLAVE (master == magenta, slave == yellow)
+#if MASTER
+    npm1300_led_colour_set(magenta);
+#else
+    npm1300_led_colour_set(yellow);
+#endif
+    return err;
+}
+
+//lp5012 init
+int lp5012_init(){
+    if(!device_is_ready(lp5012_dev)){
+        LOG_ERR("LED controller %s is not ready",lp5012_dev->name);
+        dev_not_ready_details(lp5012_dev);
+        return -1;
+    }
+    int err;
+    uint8_t buff[3] = {0xFF,0x00,0xFF};
+
+    for(int l = 0; l < 3; l++){
+        err = led_set_color(lp5012_dev,0,3,buff);
+        if(err<0){
+            LOG_ERR("Failed");
+        }
+    }
+}
 
 //when received an interrupt: red blinking 3times
 
@@ -495,7 +598,7 @@ int lora_init(){
 
 //lora send
 int lora_send_data(struct gps_data *gps){
-    gps_parse_rxbuffer(gps, gps_rx_uart_buffer, GPS_RX_BUF_SIZE); 
+    gps_poll(gps);
 
     struct lora_payload payload = {
         .preamble = LORA_PREAMBLE,
@@ -544,6 +647,7 @@ int lora_receive_data(struct gps_data *gps_slave,uint64_t *origin, int16_t *rssi
         gps_slave->horizontal_accuracy=payload.horizontal_accuracy;
         gps_slave->time=payload.time;
         *origin = payload.origin_device_id;
+        LOG_INF("lon; %i; lat; %i; time; %i; horAcc; %i", gps_slave->longitude, gps_slave->latitude, gps_slave->time, gps_slave->horizontal_accuracy);
         return 0;
     }
     return -1;

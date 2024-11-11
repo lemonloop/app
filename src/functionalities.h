@@ -109,7 +109,32 @@ void gps_initialize_module();
 void gps_init();
 void gps_poll(struct gps_data *gps);
 
-//
+/************ LED-Ring and Power manager: nPM1300-QEAA ************/
+typedef enum {
+    red = 0u,               // channel 0
+    blue,                   // channel 1
+    green,                  // channel 2
+    yellow,                 // red and green
+    magenta,                // red and blue
+    cyan,                   // green and blue
+    white,                  // red, green and blue
+    n_elements_led_color    // not a valid color
+} led_color_t;
+
+static const struct device *regulator = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_regulators));
+static const struct device *charger = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_charger));
+static const struct device *npm_led = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_leds));
+static const struct device *npm_gpios = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_gpio));
+static const struct device *npm1300 = DEVICE_DT_GET(DT_NODELABEL(npm1300));
+
+static const struct device *lp5012_dev = DEVICE_DT_GET_ANY(ti_lp5012);
+
+void dev_not_ready_details(const struct device* dev);
+int npm1300_led_colour_set(led_color_t colour);
+int npm1300_init();
+int lp5012_init();
+
+/************ LoRa ************/
 #define LORA_PREAMBLE   0b1010110011110000 //2 bytes / 8 bit
 
 // TODO: add information on interrupt

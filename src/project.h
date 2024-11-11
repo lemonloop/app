@@ -6,6 +6,11 @@
 #include <zephyr/drivers/spi.h>
 #include <zephyr/drivers/lora.h>
 #include <zephyr/drivers/sensor.h>
+#include <zephyr/drivers/led.h>
+#include <zephyr/drivers/led/lp50xx.h>
+#include <zephyr/drivers/sensor/npm1300_charger.h>
+#include <zephyr/drivers/regulator.h>
+#include <zephyr/drivers/mfd/npm1300.h>
 #include <zephyr/logging/log.h>
 #include "u_ubx_protocol.h"
 
